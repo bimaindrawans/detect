@@ -1,5 +1,10 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, IntentsBitField } from 'discord.js';
 import { PrismaClient } from '@prisma/client';
+import express from 'express';
+import startServer from './uptime.js';
+
+const app = express();
+const port = 3000;
 
 const client = new Client({
     intents: [
@@ -15,29 +20,39 @@ const prisma = new PrismaClient();
 const botsPerPage = 10;
 
 // Helper function to create bot embed
-async function createBotEmbed(guild, bots, page) {
+async function createBotEmbed(guild, bots, page, totalAvailable, totalUnavailable) {
     const startIndex = page * botsPerPage;
     const endIndex = startIndex + botsPerPage;
     const botsOnPage = bots.slice(startIndex, endIndex);
 
+    // Mengurutkan botsOnPage berdasarkan displayName
+    botsOnPage.sort((a, b) => {
+        const memberA = guild.members.cache.get(a.bot_id);
+        const memberB = guild.members.cache.get(b.bot_id);
+
+        // Add null checks before accessing displayName
+        const displayNameA = memberA ? memberA.displayName.toLowerCase() : "Unknown Bot";
+        const displayNameB = memberB ? memberB.displayName.toLowerCase() : "Unknown Bot";
+
+        return displayNameA.localeCompare(displayNameB);
+    });
+
     const botsStatus = await Promise.all(botsOnPage.map(async bot => {
         const voice = guild.voiceStates.cache.get(bot.bot_id);
-        const b = await guild.members.fetch({ user: bot.bot_id }).catch(() => ({ displayName: "Unknown Bot" }));
-        return voice ? `❎ | ${b.displayName}` : `✅ | ${b.displayName}`;
+        const member = await guild.members.fetch({ user: bot.bot_id }).catch(() => ({ displayName: "Unknown Bot" }));
+        return voice ? `<a:no:1027221422675869786> | ${member.displayName}` : `<a:yes:1027221458830762105> | ${member.displayName}`;
     }));
 
-    const availableCount = botsStatus.filter(status => status.startsWith("✅")).length;
-    const unavailableCount = botsStatus.filter(status => status.startsWith("❎")).length;
-
     const embed = new EmbedBuilder()
+        .setColor('#2f3136')  // Set the color to #2f3136
         .setAuthor({
             name: `${guild.name} Available Music Bots (Page ${page + 1})`,
             iconURL: guild.iconURL({ size: 4096 })
         })
         .setDescription(botsStatus.join("\n"))
         .addFields(
-            { name: "✅ Total Available on Page", value: availableCount.toString(), inline: true },
-            { name: "❌ Total Unavailable on Page", value: unavailableCount.toString(), inline: true }
+            { name: "<a:yes:1027221458830762105> Total Available", value: totalAvailable.toString(), inline: true },
+            { name: "<a:no:1027221422675869786> Total Unavailable", value: totalUnavailable.toString(), inline: true }
         );
 
     return embed;
@@ -60,7 +75,10 @@ client.on("messageCreate", async message => {
             return message.reply("There are no music bots in this server.");
         }
 
-        const embed = await createBotEmbed(message.guild, bots, 0);
+        const totalAvailable = bots.filter(bot => !message.guild.voiceStates.cache.has(bot.bot_id)).length;
+        const totalUnavailable = bots.length - totalAvailable;
+
+        const embed = await createBotEmbed(message.guild, bots, 0, totalAvailable, totalUnavailable);
 
         const row = new ActionRowBuilder()
             .addComponents(
@@ -93,7 +111,7 @@ client.on("messageCreate", async message => {
                 currentPage = Math.min(Math.ceil(bots.length / botsPerPage) - 1, currentPage + 1);
             }
 
-            const newEmbed = await createBotEmbed(message.guild, bots, currentPage);
+            const newEmbed = await createBotEmbed(message.guild, bots, currentPage, totalAvailable, totalUnavailable);
             const newRow = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -177,3 +195,4 @@ client.on("messageCreate", async message => {
 });
 
 await client.login(process.env.BOT_TOKEN);
+startServer();
