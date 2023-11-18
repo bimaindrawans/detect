@@ -44,7 +44,7 @@ async function createBotEmbed(guild, bots, page) {
     let totalAvailable = 0;
     let totalUnavailable = 0;
 
-    const botsStatus = await Promise.all(botsOnPage.map(async bot => {
+    const botsStatus = await Promise.all(bots.map(async bot => {
         const voice = guild.voiceStates.cache.get(bot.bot_id);
         const member = await guild.members.fetch({ user: bot.bot_id }).catch(() => ({ displayName: "Unknown Bot" }));
 
