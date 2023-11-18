@@ -29,7 +29,7 @@ async function createBotEmbed(guild, bots, page) {
     const endIndex = startIndex + botsPerPage;
     const botsOnPage = bots.slice(startIndex, endIndex);
 
-    // Mengurutkan botsOnPage berdasarkan displayName
+    // Sort botsOnPage alphabetically based on displayName
     botsOnPage.sort((a, b) => {
         const memberA = guild.members.cache.get(a.bot_id);
         const memberB = guild.members.cache.get(b.bot_id);
@@ -44,7 +44,7 @@ async function createBotEmbed(guild, bots, page) {
     let totalAvailable = 0;
     let totalUnavailable = 0;
 
-    const botsStatus = await Promise.all(bots.map(async bot => {
+    const botsStatus = await Promise.all(botsOnPage.map(async bot => {
         const voice = guild.voiceStates.cache.get(bot.bot_id);
         const member = await guild.members.fetch({ user: bot.bot_id }).catch(() => ({ displayName: "Unknown Bot" }));
 
