@@ -19,8 +19,12 @@ const client = new Client({
 const prisma = new PrismaClient();
 const botsPerPage = 10;
 
+client.on("ready", () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+});
+
 // Helper function to create bot embed
-async function createBotEmbed(guild, bots, page, totalAvailable, totalUnavailable) {
+async function createBotEmbed(guild, bots, page) {
     const startIndex = page * botsPerPage;
     const endIndex = startIndex + botsPerPage;
     const botsOnPage = bots.slice(startIndex, endIndex);
@@ -37,10 +41,23 @@ async function createBotEmbed(guild, bots, page, totalAvailable, totalUnavailabl
         return displayNameA.localeCompare(displayNameB);
     });
 
+    let totalAvailable = 0;
+    let totalUnavailable = 0;
+
     const botsStatus = await Promise.all(botsOnPage.map(async bot => {
         const voice = guild.voiceStates.cache.get(bot.bot_id);
         const member = await guild.members.fetch({ user: bot.bot_id }).catch(() => ({ displayName: "Unknown Bot" }));
-        return voice ? `<a:no:1027221422675869786> | ${member.displayName}` : `<a:yes:1027221458830762105> | ${member.displayName}`;
+
+        // Check if the bot is in a voice channel
+        const isInVoiceChannel = voice && voice.channelId;
+
+        if (isInVoiceChannel) {
+            totalUnavailable += 1;
+            return `<a:no:1027221422675869786> | ${member.displayName}`;
+        } else {
+            totalAvailable += 1;
+            return `<a:yes:1027221458830762105> | ${member.displayName}`;
+        }
     }));
 
     const embed = new EmbedBuilder()
